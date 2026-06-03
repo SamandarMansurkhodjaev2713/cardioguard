@@ -1,0 +1,49 @@
+# ── Android / Kotlin (legacy module) ─────────────────────────────────────────
+*.iml
+.gradle
+.kotlin
+/local.properties
+local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+build/
+/captures
+.externalNativeBuild
+.cxx
+
+# ── Signing / secrets (never commit) ─────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+debug.keystore
+*.keystore
+*.jks
+
+# ── React Native / Expo (mobile/) ────────────────────────────────────────────
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+*.tsbuildinfo
+.metro-health-check*
+
+# ── Logs & OS ────────────────────────────────────────────────────────────────
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+Thumbs.db
+
+# ── Claude agent config (local tooling, not part of the app) ─────────────────
+.claude/
+
+# ── Temporary work artifacts ─────────────────────────────────────────────────
+mobile/qr.html
+*.bak

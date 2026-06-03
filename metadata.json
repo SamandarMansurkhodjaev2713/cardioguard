@@ -1,0 +1,6 @@
+{
+  "name": "CardioGuard",
+  "description": "Digital cardiometabolic health monitoring and cardiovascular disease prevention system built for researchers and patients.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
