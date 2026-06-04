@@ -5,14 +5,23 @@
  * Replaced wholesale once a real backend exists (see repository abstraction).
  */
 
-import { calculateBmi } from '../domain/calculators';
+import { evaluateAlerts } from '../domain/alertEngine';
+import { calculateBmi, classifyRiskCategory, riskPercentFor } from '../domain/calculators';
+import { generateCohortMembers } from '../domain/cohort';
+import { LAB_DEFAULTS } from '../domain/constants';
+import { classifyMoodState, latestMoodEntry } from '../domain/mood';
 import type {
+  Alert,
+  Doctor,
   HealthMeasurement,
   Medication,
   MedicationLog,
   MoodEntry,
+  PatientRecord,
   UserProfile,
 } from '../domain/types';
+import { mulberry32 } from '../utils/prng';
+import { buildPatientRecord } from './patientGenerator';
 
 const HEIGHT_CM = 178;
 
@@ -174,4 +183,93 @@ export function createPatientSeed(now: Date): PatientSeed {
   }));
 
   return { profile, measurements, medications, medicationLogs, moodEntries };
+}
+
+// ── Multi-user demo (1 doctor + a roster of real patient records) ─────────────
+
+/** Compute early-warning alerts for a patient's data (reuses the pure engines). */
+function recordAlerts(
+  profile: UserProfile,
+  measurements: HealthMeasurement[],
+  medicationLogs: MedicationLog[],
+  moodEntries: MoodEntry[],
+  now: Date,
+): Alert[] {
+  const latest = measurements[0];
+  const inputs = {
+    systolicBp: latest?.systolicBp ?? 120,
+    totalCholMmol: profile.totalCholMmol ?? LAB_DEFAULTS.TOTAL_CHOL_MMOL,
+    hdlCholMmol: profile.hdlCholMmol ?? LAB_DEFAULTS.HDL_MMOL,
+  };
+  const percent = riskPercentFor('score2', profile, inputs);
+  const category = classifyRiskCategory(percent, 'score2', profile.age);
+  const latestMood = latestMoodEntry(moodEntries);
+  const drafts = evaluateAlerts(
+    {
+      measurements,
+      medicationLogs,
+      riskPercent: percent,
+      riskCategory: category,
+      latestMoodState: latestMood ? classifyMoodState(latestMood) : undefined,
+    },
+    now,
+  );
+  return drafts.map((d, i) => ({
+    id: `al_${profile.anonymizedId}_${i}`,
+    userId: profile.id,
+    date: now.toISOString(),
+    type: d.type,
+    severity: d.severity,
+    params: d.params,
+    isRead: false,
+  }));
+}
+
+export interface MultiUserSeed {
+  readonly doctors: Doctor[];
+  readonly records: Record<string, PatientRecord>;
+  readonly demoDoctorId: string;
+  readonly demoPatientId: string;
+}
+
+/**
+ * The demo data the app boots with: one clinician and a roster of patients with
+ * full histories — the patient "Алишер" (rich, hand-tuned) plus five generated
+ * patients, all enrolled under the doctor. Deterministic given `now`.
+ */
+export function createMultiUserSeed(now: Date): MultiUserSeed {
+  const doctor: Doctor = {
+    id: 'doc_01',
+    fullName: 'Д-р Сардор Алиев',
+    specialty: 'Кардиолог',
+    inviteCode: 'CARD-4827',
+    organization: 'Кардиологический центр',
+  };
+
+  // Rich demo patient (Алишер), enrolled under the doctor.
+  const base = createPatientSeed(now);
+  const profile: UserProfile = { ...base.profile, doctorId: doctor.id };
+  const alisher: PatientRecord = {
+    profile,
+    measurements: base.measurements,
+    medications: base.medications,
+    medicationLogs: base.medicationLogs,
+    moodEntries: base.moodEntries,
+    alerts: recordAlerts(profile, base.measurements, base.medicationLogs, base.moodEntries, now),
+    symptoms: [],
+    carePlan: { targetSystolicBp: 130, targetWeightKg: 88 },
+    notes: [],
+    messages: [],
+  };
+
+  const records: Record<string, PatientRecord> = { [alisher.profile.id]: alisher };
+
+  // Five more real patients from the deterministic cohort, all under the doctor.
+  const members = generateCohortMembers(mulberry32(0x5eed_face), { groups: ['roster'], perGroup: 5 });
+  for (const member of members) {
+    const record = buildPatientRecord(member, now, doctor.id);
+    records[record.profile.id] = record;
+  }
+
+  return { doctors: [doctor], records, demoDoctorId: doctor.id, demoPatientId: alisher.profile.id };
 }

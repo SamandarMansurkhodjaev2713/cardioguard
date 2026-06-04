@@ -1,21 +1,7 @@
 import { createApiRepository } from '../apiRepository';
-import { STATE_VERSION, type PersistedState } from '../repository';
-import { makeProfile } from '../../testing/factories';
+import { makePersistedState } from '../../testing/factories';
 
-function makeState(): PersistedState {
-  return {
-    version: STATE_VERSION,
-    role: 'patient',
-    profile: makeProfile(),
-    measurements: [],
-    medications: [],
-    medicationLogs: [],
-    alerts: [],
-    riskModel: 'score2',
-    language: 'ru',
-    themePreferences: { radius: 'strict', density: 'comfortable', appearance: 'light' },
-  };
-}
+const makeState = makePersistedState;
 
 function res(status: number, body?: unknown): Response {
   return { ok: status >= 200 && status < 300, status, json: async () => body } as unknown as Response;

@@ -1,29 +1,13 @@
-import { isValidPersistedState, STATE_VERSION, type PersistedState } from '../repository';
-import { makeAlert, makeMeasurement, makeMedication, makeMedicationLog, makeProfile } from '../../testing/factories';
-
-function makeState(overrides: Partial<PersistedState> = {}): PersistedState {
-  return {
-    version: STATE_VERSION,
-    role: 'patient',
-    profile: makeProfile(),
-    measurements: [makeMeasurement()],
-    medications: [makeMedication()],
-    medicationLogs: [makeMedicationLog()],
-    alerts: [makeAlert()],
-    riskModel: 'score2',
-    language: 'ru',
-    themePreferences: { density: 'comfortable', radius: 'strict', appearance: 'light' },
-    ...overrides,
-  };
-}
+import { isValidPersistedState, STATE_VERSION } from '../repository';
+import { makePatientRecord, makePersistedState, makeProfile } from '../../testing/factories';
 
 describe('isValidPersistedState (Zod boundary guard)', () => {
   it('GIVEN a well-formed snapshot THEN accepts it', () => {
-    expect(isValidPersistedState(makeState())).toBe(true);
+    expect(isValidPersistedState(makePersistedState())).toBe(true);
   });
 
   it('GIVEN extended medical-card fields THEN still accepts it', () => {
-    const state = makeState({
+    const record = makePatientRecord({
       profile: makeProfile({
         dyslipidemiaStatus: 'yes',
         chronicConditions: ['Гипертония'],
@@ -31,27 +15,28 @@ describe('isValidPersistedState (Zod boundary guard)', () => {
         medicationNotes: 'Лизиноприл',
         unit: 'Подразделение №2',
         serviceYears: 22,
+        doctorId: 'doc_test',
       }),
     });
+    const state = makePersistedState({ records: { [record.profile.id]: record } });
     expect(isValidPersistedState(state)).toBe(true);
   });
 
-  it('GIVEN a profile WITHOUT the optional new fields THEN still accepts it (backward compatible)', () => {
-    // makeProfile() omits the extended fields → simulates a pre-upgrade blob.
-    expect(isValidPersistedState(makeState())).toBe(true);
+  it('GIVEN a record WITHOUT the optional new profile fields THEN still accepts it', () => {
+    expect(isValidPersistedState(makePersistedState())).toBe(true);
   });
 
   it('GIVEN a mismatched version THEN rejects it', () => {
-    expect(isValidPersistedState(makeState({ version: STATE_VERSION + 1 }))).toBe(false);
+    expect(isValidPersistedState(makePersistedState({ version: STATE_VERSION + 1 }))).toBe(false);
   });
 
   it('GIVEN an invalid enum value THEN rejects it', () => {
-    expect(isValidPersistedState({ ...makeState(), role: 'admin' })).toBe(false);
+    expect(isValidPersistedState({ ...makePersistedState(), role: 'admin' })).toBe(false);
   });
 
   it('GIVEN a missing required section THEN rejects it', () => {
-    const { profile: _omitted, ...withoutProfile } = makeState();
-    expect(isValidPersistedState(withoutProfile)).toBe(false);
+    const { records: _omitted, ...withoutRecords } = makePersistedState();
+    expect(isValidPersistedState(withoutRecords)).toBe(false);
   });
 
   it.each([null, undefined, 42, 'state', { bad: true }, []])(
@@ -62,6 +47,6 @@ describe('isValidPersistedState (Zod boundary guard)', () => {
   );
 
   it('GIVEN unknown extra keys THEN still accepts (lenient on extras)', () => {
-    expect(isValidPersistedState({ ...makeState(), extraFutureField: 123 })).toBe(true);
+    expect(isValidPersistedState({ ...makePersistedState(), extraFutureField: 123 })).toBe(true);
   });
 });

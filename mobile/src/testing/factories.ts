@@ -5,12 +5,15 @@
 
 import type {
   Alert,
+  Doctor,
   HealthMeasurement,
   Medication,
   MedicationLog,
   MoodEntry,
+  PatientRecord,
   UserProfile,
 } from '../domain/types';
+import { STATE_VERSION, type PersistedState } from '../data/repository';
 
 const EPOCH = '2026-06-01T08:00:00.000Z';
 
@@ -119,6 +122,50 @@ export function makeMoodEntry(overrides: Partial<MoodEntry> = {}): MoodEntry {
     sleepProblems: 1,
     fatigue: 1,
     note: '',
+    ...overrides,
+  };
+}
+
+export function makeDoctor(overrides: Partial<Doctor> = {}): Doctor {
+  return {
+    id: 'doc_test',
+    fullName: 'Д-р Тест',
+    specialty: 'Кардиолог',
+    inviteCode: 'TEST-0001',
+    ...overrides,
+  };
+}
+
+export function makePatientRecord(overrides: Partial<PatientRecord> = {}): PatientRecord {
+  return {
+    profile: makeProfile(),
+    measurements: [makeMeasurement()],
+    medications: [makeMedication()],
+    medicationLogs: [makeMedicationLog()],
+    moodEntries: [makeMoodEntry()],
+    alerts: [makeAlert()],
+    symptoms: [],
+    carePlan: {},
+    notes: [],
+    messages: [],
+    ...overrides,
+  };
+}
+
+export function makePersistedState(overrides: Partial<PersistedState> = {}): PersistedState {
+  const record = makePatientRecord();
+  return {
+    version: STATE_VERSION,
+    role: 'patient',
+    doctors: [makeDoctor()],
+    records: { [record.profile.id]: record },
+    activePatientId: record.profile.id,
+    currentDoctorId: 'doc_test',
+    demoPatientId: record.profile.id,
+    demoDoctorId: 'doc_test',
+    riskModel: 'score2',
+    language: 'ru',
+    themePreferences: { density: 'comfortable', radius: 'strict', appearance: 'light' },
     ...overrides,
   };
 }

@@ -1,21 +1,8 @@
 import { createOfflineFirstRepository } from '../repositoryFactory';
-import { STATE_VERSION, type PersistedState, type StateRepository } from '../repository';
-import { makeProfile } from '../../testing/factories';
+import { type PersistedState, type StateRepository } from '../repository';
+import { makePersistedState } from '../../testing/factories';
 
-function makeState(): PersistedState {
-  return {
-    version: STATE_VERSION,
-    role: 'patient',
-    profile: makeProfile(),
-    measurements: [],
-    medications: [],
-    medicationLogs: [],
-    alerts: [],
-    riskModel: 'score2',
-    language: 'ru',
-    themePreferences: { radius: 'strict', density: 'comfortable', appearance: 'light' },
-  };
-}
+const makeState = makePersistedState;
 
 function mockRepo(loadValue: PersistedState | null): jest.Mocked<StateRepository> {
   return {

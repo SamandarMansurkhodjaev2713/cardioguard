@@ -23,6 +23,7 @@ import type {
   SleepQuality,
   SmokingStatus,
   StressLevel,
+  SymptomType,
   Ternary,
   UserRole,
   WorkSchedule,
@@ -46,8 +47,12 @@ const INTAKE_STATUS = ['taken', 'missed', 'skipped'] as const satisfies readonly
 const ALERT_SEVERITY = ['info', 'warn', 'high'] as const satisfies readonly AlertSeverity[];
 const ALERT_TYPE = [
   'bloodPressure', 'repeatedBloodPressure', 'rapidWeight', 'bmiWorsening',
-  'lowAdherence', 'medicationAdherence', 'highCvdRisk', 'noMeasurements',
+  'lowAdherence', 'medicationAdherence', 'highCvdRisk', 'noMeasurements', 'psychDistress',
 ] as const satisfies readonly AlertType[];
+const SYMPTOM_TYPE = [
+  'chestPain', 'shortnessOfBreath', 'palpitations', 'dizziness',
+  'headache', 'swelling', 'fatigue', 'other',
+] as const satisfies readonly SymptomType[];
 const RISK_MODEL = ['score2', 'framingham'] as const satisfies readonly RiskModel[];
 const RISK_REGION = ['low', 'moderate', 'high', 'veryHigh'] as const satisfies readonly RiskRegion[];
 const RISK_CATEGORY = ['low', 'moderate', 'high', 'veryHigh'] as const satisfies readonly RiskCategory[];
@@ -91,6 +96,7 @@ export const userProfileSchema = z.object({
   medicationNotes: z.string().optional(),
   unit: z.string().optional(),
   serviceYears: z.number().optional(),
+  doctorId: z.string().nullable().optional(),
   createdAt: isoString,
   updatedAt: isoString,
 });
@@ -160,6 +166,62 @@ export const moodEntrySchema = z.object({
   note: z.string(),
 });
 
+export const symptomEntrySchema = z.object({
+  id: z.string().min(1),
+  userId: z.string().min(1),
+  date: isoString,
+  type: z.enum(SYMPTOM_TYPE),
+  severity: z.number(),
+  note: z.string(),
+});
+
+export const doctorSchema = z.object({
+  id: z.string().min(1),
+  fullName: z.string(),
+  specialty: z.string(),
+  inviteCode: z.string().min(1),
+  organization: z.string().optional(),
+});
+
+export const carePlanSchema = z.object({
+  targetSystolicBp: z.number().optional(),
+  targetDiastolicBp: z.number().optional(),
+  targetWeightKg: z.number().optional(),
+  alertSystolicBp: z.number().optional(),
+  alertDiastolicBp: z.number().optional(),
+  note: z.string().optional(),
+  updatedByDoctorId: z.string().optional(),
+  updatedAt: z.string().optional(),
+});
+
+export const clinicalNoteSchema = z.object({
+  id: z.string().min(1),
+  doctorId: z.string().min(1),
+  date: isoString,
+  text: z.string(),
+});
+
+export const messageSchema = z.object({
+  id: z.string().min(1),
+  fromRole: z.enum(USER_ROLE),
+  date: isoString,
+  text: z.string(),
+  isRead: z.boolean(),
+});
+
+export const patientRecordSchema = z.object({
+  profile: userProfileSchema,
+  measurements: z.array(healthMeasurementSchema),
+  medications: z.array(medicationSchema),
+  medicationLogs: z.array(medicationLogSchema),
+  moodEntries: z.array(moodEntrySchema),
+  alerts: z.array(alertSchema),
+  symptoms: z.array(symptomEntrySchema),
+  carePlan: carePlanSchema,
+  notes: z.array(clinicalNoteSchema),
+  messages: z.array(messageSchema),
+});
+
 export const themePreferencesSchema = z.object({
   density: z.enum(DENSITY),
   radius: z.enum(RADIUS),
@@ -167,21 +229,20 @@ export const themePreferencesSchema = z.object({
 });
 
 /**
- * Top-level persisted snapshot. `version` is validated structurally here; the
- * exact-version match (migration boundary) stays in the repository so this
- * module needs no back-reference to `STATE_VERSION`.
+ * Top-level persisted snapshot (multi-user). `version` is validated structurally
+ * here; the exact-version match (migration boundary) stays in the repository.
  */
 export const persistedStateSchema = z.object({
   version: z.number(),
   role: z.enum(USER_ROLE),
-  profile: userProfileSchema,
-  measurements: z.array(healthMeasurementSchema),
-  medications: z.array(medicationSchema),
-  medicationLogs: z.array(medicationLogSchema),
-  alerts: z.array(alertSchema),
+  doctors: z.array(doctorSchema),
+  records: z.record(patientRecordSchema),
+  activePatientId: z.string().min(1),
+  currentDoctorId: z.string().min(1),
+  demoPatientId: z.string().min(1),
+  demoDoctorId: z.string().min(1),
   riskModel: z.enum(RISK_MODEL),
   language: z.enum(LANGUAGE),
   themePreferences: themePreferencesSchema,
   remindersEnabled: z.boolean().optional(),
-  moodEntries: z.array(moodEntrySchema).optional(),
 });

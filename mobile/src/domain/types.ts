@@ -133,6 +133,8 @@ export interface UserProfile {
   readonly unit?: string;
   /** Years of service (for personnel; affects no calculation, shown on the card). */
   readonly serviceYears?: number;
+  /** Enrolled clinician (multi-user link). Null/undefined = not yet linked. */
+  readonly doctorId?: string | null;
   /** ISO-8601 timestamps (serializable; survive AsyncStorage round-trips). */
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -279,4 +281,92 @@ export interface MoodEntry {
   readonly sleepProblems: number;
   readonly fatigue: number;
   readonly note: string;
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Multi-user model (TZ: patient ↔ doctor). Local & single-device for now, but
+// shaped for a real backend swap: a doctor owns a roster of patients (linked by
+// an invite code), opens any patient's full record, and acts on it (care plan,
+// medications, notes, messages). Each patient owns their data and links to one
+// doctor. Reuses the existing per-patient entities above.
+// ────────────────────────────────────────────────────────────────────────────
+
+/** A clinician account. Patients enroll under a doctor using {@link Doctor.inviteCode}. */
+export interface Doctor {
+  readonly id: string;
+  readonly fullName: string;
+  /** Free label / i18n-resolvable specialty (e.g. 'Кардиолог'). */
+  readonly specialty: string;
+  /** Code a patient enters to link to this clinician (e.g. 'CARD-4827'). */
+  readonly inviteCode: string;
+  readonly organization?: string;
+}
+
+/** Symptom categories a patient can self-report (canonical codes; labels via i18n). */
+export type SymptomType =
+  | 'chestPain'
+  | 'shortnessOfBreath'
+  | 'palpitations'
+  | 'dizziness'
+  | 'headache'
+  | 'swelling'
+  | 'fatigue'
+  | 'other';
+
+/** A patient-logged symptom event (severity 1 = mild … 3 = severe). */
+export interface SymptomEntry {
+  readonly id: string;
+  readonly userId: string;
+  readonly date: string; // ISO-8601
+  readonly type: SymptomType;
+  readonly severity: number;
+  readonly note: string;
+}
+
+/** Doctor-set treatment plan; overrides default targets/alert thresholds when present. */
+export interface CarePlan {
+  readonly targetSystolicBp?: number;
+  readonly targetDiastolicBp?: number;
+  readonly targetWeightKg?: number;
+  /** Per-patient early-warning override (systolic mm Hg) — defaults apply when unset. */
+  readonly alertSystolicBp?: number;
+  readonly alertDiastolicBp?: number;
+  /** Plan summary / instructions to the patient. */
+  readonly note?: string;
+  readonly updatedByDoctorId?: string;
+  readonly updatedAt?: string; // ISO-8601
+}
+
+/** A clinician's note on a patient. */
+export interface ClinicalNote {
+  readonly id: string;
+  readonly doctorId: string;
+  readonly date: string; // ISO-8601
+  readonly text: string;
+}
+
+/** A message in the patient ↔ doctor thread. */
+export interface Message {
+  readonly id: string;
+  readonly fromRole: UserRole; // who sent it
+  readonly date: string; // ISO-8601
+  readonly text: string;
+  readonly isRead: boolean;
+}
+
+/**
+ * The complete record for one patient — the unit a doctor opens and acts on, and
+ * the data a patient owns. The active record drives every patient-facing screen.
+ */
+export interface PatientRecord {
+  readonly profile: UserProfile;
+  readonly measurements: HealthMeasurement[];
+  readonly medications: Medication[];
+  readonly medicationLogs: MedicationLog[];
+  readonly moodEntries: MoodEntry[];
+  readonly alerts: Alert[];
+  readonly symptoms: SymptomEntry[];
+  readonly carePlan: CarePlan;
+  readonly notes: ClinicalNote[];
+  readonly messages: Message[];
 }

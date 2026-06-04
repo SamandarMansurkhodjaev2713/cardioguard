@@ -5,37 +5,36 @@
  */
 
 import type {
-  Alert,
-  HealthMeasurement,
-  Medication,
-  MedicationLog,
-  MoodEntry,
+  Doctor,
+  PatientRecord,
   RiskModel,
-  UserProfile,
   UserRole,
 } from '../domain/types';
 import type { AppLanguage } from '../i18n';
 import type { ThemePreferences } from '../theme/ThemeProvider';
 import { persistedStateSchema } from './schemas';
 
-export const STATE_VERSION = 1;
+/** v2: multi-user model (doctor roster + keyed patient records). v1 blobs re-seed. */
+export const STATE_VERSION = 2;
 
-/** The serializable snapshot persisted between launches. */
+/** The serializable snapshot persisted between launches (multi-user). */
 export interface PersistedState {
   readonly version: number;
   readonly role: UserRole;
-  readonly profile: UserProfile;
-  readonly measurements: readonly HealthMeasurement[];
-  readonly medications: readonly Medication[];
-  readonly medicationLogs: readonly MedicationLog[];
-  readonly alerts: readonly Alert[];
+  readonly doctors: readonly Doctor[];
+  /** Patient records keyed by patient id. */
+  readonly records: Readonly<Record<string, PatientRecord>>;
+  /** Patient currently in view (logged-in patient, or doctor's open patient). */
+  readonly activePatientId: string;
+  /** The logged-in clinician (when role === 'doctor'). */
+  readonly currentDoctorId: string;
+  /** Stable identities for the demo "login as patient / doctor" shortcuts. */
+  readonly demoPatientId: string;
+  readonly demoDoctorId: string;
   readonly riskModel: RiskModel;
   readonly language: AppLanguage;
   readonly themePreferences: ThemePreferences;
-  /** Optional (added after v1 shipped); absent in older blobs → defaults to off. */
   readonly remindersEnabled?: boolean;
-  /** Weekly wellbeing check-ins (Module 5); absent in older blobs → empty. */
-  readonly moodEntries?: readonly MoodEntry[];
 }
 
 export interface StateRepository {

@@ -2,6 +2,13 @@
  * Application store (Zustand) — the infrastructure layer that owns mutable state
  * and orchestrates the pure domain engines + persistence. All side effects
  * (clock, id generation, storage I/O) live here so the domain stays pure.
+ *
+ * Multi-user model: the app holds a doctor roster + a map of patient records.
+ * Exactly one record is "active" at a time (the logged-in patient, or the patient
+ * a doctor has opened); its fields are mirrored onto the top-level slices
+ * (`profile`, `measurements`, …) so every patient-facing screen keeps reading the
+ * same shape it always has. Writes go through `commitActive`, which updates both
+ * the record map and the mirror. Shaped for a real backend swap later.
  */
 
 import { create } from 'zustand';
@@ -18,11 +25,16 @@ import { generateRecommendations } from '../domain/riskEngine';
 import { BMI, LAB_DEFAULTS, SCORE2 } from '../domain/constants';
 import type {
   Alert,
+  CarePlan,
+  ClinicalNote,
+  Doctor,
   HealthMeasurement,
   Medication,
   MedicationIntakeStatus,
   MedicationLog,
+  Message,
   MoodEntry,
+  PatientRecord,
   Recommendation,
   RiskAssumptionKey,
   RiskCategory,
@@ -32,6 +44,8 @@ import type {
   Sex,
   SmokingStatus,
   StressLevel,
+  SymptomEntry,
+  SymptomType,
   Ternary,
   UserProfile,
   UserRole,
@@ -40,7 +54,7 @@ import { DEFAULT_THEME_PREFERENCES, type ThemePreferences } from '../theme/Theme
 import { FALLBACK_LANGUAGE, type AppLanguage } from '../i18n';
 import { STATE_VERSION, type PersistedState, type StateRepository } from '../data/repository';
 import { createRepository } from '../data/repositoryFactory';
-import { createPatientSeed } from '../data/seed';
+import { createMultiUserSeed } from '../data/seed';
 
 // ── Id generation ────────────────────────────────────────────────────────────
 let idSeq = 0;
@@ -73,7 +87,6 @@ export interface MedicationInput {
   readonly instructions: string;
 }
 
-/** A weekly wellbeing check-in submission (TZ Module 5). Each item is 0–4. */
 export interface MoodEntryInput {
   readonly lowMood: number;
   readonly anxiety: number;
@@ -84,8 +97,6 @@ export interface MoodEntryInput {
   readonly note: string;
 }
 
-/** Editable subset of the medical card (TZ Module 1). All fields optional — only
- *  the touched ones are merged. */
 export interface MedicalProfileInput {
   readonly age?: number;
   readonly sex?: Sex;
@@ -102,24 +113,63 @@ export interface MedicalProfileInput {
   readonly medicationNotes?: string;
 }
 
+/** Symptom self-report (TZ Module: patient self-management). */
+export interface SymptomInput {
+  readonly type: SymptomType;
+  readonly severity: number;
+  readonly note: string;
+}
+
+/** Doctor-set care plan fields (all optional — only touched ones are merged). */
+export interface CarePlanInput {
+  readonly targetSystolicBp?: number;
+  readonly targetDiastolicBp?: number;
+  readonly targetWeightKg?: number;
+  readonly alertSystolicBp?: number;
+  readonly alertDiastolicBp?: number;
+  readonly note?: string;
+}
+
 // ── Derived risk result ──────────────────────────────────────────────────────
 export interface RiskResult {
   readonly percent: number;
   readonly category: RiskCategory;
   readonly factorKeys: readonly RiskFactorKey[];
-  /** Assumptions the model had to make (missing labs, age out of range). */
   readonly assumptionKeys: readonly RiskAssumptionKey[];
 }
 
+/** The patient-data fields mirrored from the active record onto the top level. */
+type ActiveMirror = Pick<
+  AppState,
+  'profile' | 'measurements' | 'medications' | 'medicationLogs' | 'moodEntries'
+  | 'alerts' | 'symptoms' | 'carePlan' | 'notes' | 'messages'
+>;
+
 interface AppState {
   readonly hydrated: boolean;
-  readonly role: UserRole;
+
+  // Multi-user model
+  readonly doctors: Doctor[];
+  readonly records: Record<string, PatientRecord>;
+  readonly activePatientId: string;
+  readonly currentDoctorId: string;
+  readonly demoPatientId: string;
+  readonly demoDoctorId: string;
+
+  // Active-record mirror (every patient-facing screen reads these)
   readonly profile: UserProfile;
   readonly measurements: HealthMeasurement[];
   readonly medications: Medication[];
   readonly medicationLogs: MedicationLog[];
   readonly moodEntries: MoodEntry[];
   readonly alerts: Alert[];
+  readonly symptoms: SymptomEntry[];
+  readonly carePlan: CarePlan;
+  readonly notes: ClinicalNote[];
+  readonly messages: Message[];
+
+  // Global / session
+  readonly role: UserRole;
   readonly riskModel: RiskModel;
   readonly language: AppLanguage;
   readonly themePreferences: ThemePreferences;
@@ -127,16 +177,26 @@ interface AppState {
 
   readonly hydrate: () => Promise<void>;
   readonly enterAs: (role: UserRole) => void;
+  readonly openPatient: (patientId: string) => void;
   readonly addMeasurement: (input: MeasurementInput) => void;
   readonly addMedication: (input: MedicationInput) => void;
+  readonly updateMedication: (id: string, input: Partial<MedicationInput>) => void;
+  readonly deleteMedication: (id: string) => void;
   readonly recordIntake: (medicationId: string, scheduledTime: string) => void;
   readonly addMoodEntry: (input: MoodEntryInput) => void;
+  readonly addSymptom: (input: SymptomInput) => void;
   readonly setLogStatus: (logId: string, status: MedicationIntakeStatus) => void;
   readonly markAlertRead: (id: string) => void;
   readonly clearReadAlerts: () => void;
   readonly setRiskModel: (model: RiskModel) => void;
   readonly setRiskInputs: (input: { totalCholMmol?: number; hdlCholMmol?: number; riskRegion?: RiskRegion }) => void;
   readonly setGoals: (goals: { targetSystolicBp?: number; targetWeightKg?: number }) => void;
+  readonly setCarePlan: (input: CarePlanInput) => void;
+  readonly addNote: (text: string) => void;
+  readonly sendMessage: (text: string) => void;
+  readonly markMessagesRead: () => void;
+  readonly linkToDoctor: (inviteCode: string) => boolean;
+  readonly unlinkDoctor: () => void;
   readonly updateMedicalProfile: (input: MedicalProfileInput) => void;
   readonly setRemindersEnabled: (enabled: boolean) => void;
   readonly setLanguage: (language: AppLanguage) => void;
@@ -162,7 +222,7 @@ function computeFactorKeys(profile: UserProfile, latest: HealthMeasurement | und
   return keys;
 }
 
-export function deriveRisk(state: Pick<AppState, 'profile' | 'measurements' | 'riskModel'>): RiskResult {
+export function deriveRisk(state: { profile: UserProfile; measurements: readonly HealthMeasurement[]; riskModel: RiskModel }): RiskResult {
   const { profile } = state;
   const latest = state.measurements[0];
 
@@ -187,15 +247,15 @@ export function deriveRisk(state: Pick<AppState, 'profile' | 'measurements' | 'r
 // ── Alert merge (dedup against existing unread of the same type) ──────────────
 function mergeAlerts(
   existing: readonly Alert[],
-  state: Pick<AppState, 'profile' | 'measurements' | 'medicationLogs' | 'moodEntries'>,
+  data: { profile: UserProfile; measurements: HealthMeasurement[]; medicationLogs: MedicationLog[]; moodEntries: MoodEntry[] },
   risk: RiskResult,
   now: Date,
 ): Alert[] {
-  const latestMood = latestMoodEntry(state.moodEntries);
+  const latestMood = latestMoodEntry(data.moodEntries);
   const drafts = evaluateAlerts(
     {
-      measurements: state.measurements,
-      medicationLogs: state.medicationLogs,
+      measurements: data.measurements,
+      medicationLogs: data.medicationLogs,
       riskPercent: risk.percent,
       riskCategory: risk.category,
       latestMoodState: latestMood ? classifyMoodState(latestMood) : undefined,
@@ -207,7 +267,7 @@ function mergeAlerts(
     if (result.some((a) => a.type === draft.type && !a.isRead)) continue;
     result.unshift({
       id: nextId(`al_${draft.type}`),
-      userId: state.profile.id,
+      userId: data.profile.id,
       date: now.toISOString(),
       type: draft.type,
       severity: draft.severity,
@@ -218,47 +278,80 @@ function mergeAlerts(
   return result;
 }
 
+/** Project a record onto the top-level mirror fields. */
+function mirror(record: PatientRecord): ActiveMirror {
+  return {
+    profile: record.profile,
+    measurements: record.measurements,
+    medications: record.medications,
+    medicationLogs: record.medicationLogs,
+    moodEntries: record.moodEntries,
+    alerts: record.alerts,
+    symptoms: record.symptoms,
+    carePlan: record.carePlan,
+    notes: record.notes,
+    messages: record.messages,
+  };
+}
+
 function toPersisted(state: AppState): PersistedState {
   return {
     version: STATE_VERSION,
     role: state.role,
-    profile: state.profile,
-    measurements: state.measurements,
-    medications: state.medications,
-    medicationLogs: state.medicationLogs,
-    alerts: state.alerts,
+    doctors: state.doctors,
+    records: state.records,
+    activePatientId: state.activePatientId,
+    currentDoctorId: state.currentDoctorId,
+    demoPatientId: state.demoPatientId,
+    demoDoctorId: state.demoDoctorId,
     riskModel: state.riskModel,
     language: state.language,
     themePreferences: state.themePreferences,
     remindersEnabled: state.remindersEnabled,
-    moodEntries: state.moodEntries,
   };
 }
 
+const initialSeed = createMultiUserSeed(new Date());
+const initialActive = initialSeed.records[initialSeed.demoPatientId];
+
 export const useAppStore = create<AppState>((set, get) => {
-  // Persist the current snapshot. localRepository.save catches its own errors,
-  // so this is safe to call without awaiting.
   const persist = () => {
     void repository.save(toPersisted(get()));
   };
 
-  // Recompute alerts from current data and persist.
+  /** Update the active patient's record + the top-level mirror, then persist. */
+  const commitActive = (patch: Partial<PatientRecord>) => {
+    const { activePatientId, records } = get();
+    const current = records[activePatientId];
+    if (!current) return;
+    const updated: PatientRecord = { ...current, ...patch };
+    set({ records: { ...records, [activePatientId]: updated }, ...mirror(updated) });
+    persist();
+  };
+
+  /** Recompute the active patient's alerts and persist. */
   const refreshAlerts = () => {
     const state = get();
-    const risk = deriveRisk(state);
-    set({ alerts: mergeAlerts(state.alerts, state, risk, new Date()) });
-    persist();
+    const record = state.records[state.activePatientId];
+    if (!record) {
+      persist();
+      return;
+    }
+    const risk = deriveRisk({ profile: record.profile, measurements: record.measurements, riskModel: state.riskModel });
+    const alerts = mergeAlerts(record.alerts, record, risk, new Date());
+    commitActive({ alerts });
   };
 
   return {
     hydrated: false,
+    doctors: initialSeed.doctors,
+    records: initialSeed.records,
+    activePatientId: initialSeed.demoPatientId,
+    currentDoctorId: initialSeed.demoDoctorId,
+    demoPatientId: initialSeed.demoPatientId,
+    demoDoctorId: initialSeed.demoDoctorId,
+    ...mirror(initialActive),
     role: 'patient',
-    profile: createPatientSeed(new Date()).profile,
-    measurements: [],
-    medications: [],
-    medicationLogs: [],
-    moodEntries: [],
-    alerts: [],
     riskModel: 'score2',
     language: FALLBACK_LANGUAGE,
     themePreferences: DEFAULT_THEME_PREFERENCES,
@@ -267,15 +360,17 @@ export const useAppStore = create<AppState>((set, get) => {
     async hydrate() {
       const persisted = await repository.load();
       if (persisted) {
+        const active = persisted.records[persisted.activePatientId];
         set({
           hydrated: true,
           role: persisted.role,
-          profile: persisted.profile,
-          measurements: [...persisted.measurements],
-          medications: [...persisted.medications],
-          medicationLogs: [...persisted.medicationLogs],
-          moodEntries: persisted.moodEntries ? [...persisted.moodEntries] : [],
-          alerts: [...persisted.alerts],
+          doctors: [...persisted.doctors],
+          records: { ...persisted.records },
+          activePatientId: persisted.activePatientId,
+          currentDoctorId: persisted.currentDoctorId,
+          demoPatientId: persisted.demoPatientId,
+          demoDoctorId: persisted.demoDoctorId,
+          ...(active ? mirror(active) : {}),
           riskModel: persisted.riskModel,
           language: persisted.language,
           themePreferences: persisted.themePreferences,
@@ -283,24 +378,39 @@ export const useAppStore = create<AppState>((set, get) => {
         });
         return;
       }
-      // First launch — seed the demo patient and compute initial alerts.
-      const now = new Date();
-      const seed = createPatientSeed(now);
+      // First launch — seed the multi-user demo and compute the patient's alerts.
+      const seed = createMultiUserSeed(new Date());
+      const active = seed.records[seed.demoPatientId];
       set({
         hydrated: true,
         role: 'patient',
-        profile: seed.profile,
-        measurements: seed.measurements,
-        medications: seed.medications,
-        medicationLogs: seed.medicationLogs,
-        moodEntries: seed.moodEntries,
-        alerts: [],
+        doctors: seed.doctors,
+        records: seed.records,
+        activePatientId: seed.demoPatientId,
+        currentDoctorId: seed.demoDoctorId,
+        demoPatientId: seed.demoPatientId,
+        demoDoctorId: seed.demoDoctorId,
+        ...mirror(active),
       });
       refreshAlerts();
     },
 
     enterAs(role) {
-      set({ role });
+      const state = get();
+      if (role === 'patient') {
+        const id = state.records[state.demoPatientId] ? state.demoPatientId : state.activePatientId;
+        const record = state.records[id];
+        set({ role: 'patient', activePatientId: id, ...(record ? mirror(record) : {}) });
+      } else {
+        set({ role: 'doctor', currentDoctorId: state.demoDoctorId });
+      }
+      persist();
+    },
+
+    openPatient(patientId) {
+      const record = get().records[patientId];
+      if (!record) return;
+      set({ activePatientId: patientId, ...mirror(record) });
       persist();
     },
 
@@ -324,14 +434,9 @@ export const useAppStore = create<AppState>((set, get) => {
         steps: input.steps,
         notes: input.notes,
       };
-      set({
+      commitActive({
         measurements: [measurement, ...measurements],
-        profile: {
-          ...profile,
-          weightKg: input.weightKg,
-          waistCircumferenceCm: input.waistCircumferenceCm,
-          updatedAt: measurement.date,
-        },
+        profile: { ...profile, weightKg: input.weightKg, waistCircumferenceCm: input.waistCircumferenceCm, updatedAt: measurement.date },
       });
       refreshAlerts();
     },
@@ -350,23 +455,47 @@ export const useAppStore = create<AppState>((set, get) => {
         instructions: input.instructions,
         isActive: true,
       };
-      set({ medications: [...medications, medication] });
-      persist();
+      commitActive({ medications: [...medications, medication] });
+    },
+
+    updateMedication(id, input) {
+      const { medications } = get();
+      commitActive({
+        medications: medications.map((m) =>
+          m.id === id
+            ? {
+                ...m,
+                ...(input.name !== undefined ? { name: input.name } : {}),
+                ...(input.dosage !== undefined ? { dosage: input.dosage } : {}),
+                ...(input.frequencyPerDay !== undefined ? { frequencyPerDay: input.frequencyPerDay } : {}),
+                ...(input.intakeTimes !== undefined ? { intakeTimes: [...input.intakeTimes] } : {}),
+                ...(input.instructions !== undefined ? { instructions: input.instructions } : {}),
+              }
+            : m,
+        ),
+      });
+    },
+
+    deleteMedication(id) {
+      const { medications, medicationLogs } = get();
+      commitActive({
+        medications: medications.filter((m) => m.id !== id),
+        medicationLogs: medicationLogs.filter((l) => l.medicationId !== id),
+      });
     },
 
     recordIntake(medicationId, scheduledTime) {
       const { profile, medicationLogs } = get();
-      const now = new Date();
       const log: MedicationLog = {
         id: nextId('log'),
         medicationId,
         userId: profile.id,
         scheduledTime,
-        actualTime: now.toISOString(),
+        actualTime: new Date().toISOString(),
         status: 'taken',
         note: '',
       };
-      set({ medicationLogs: [...medicationLogs, log] });
+      commitActive({ medicationLogs: [...medicationLogs, log] });
       refreshAlerts();
     },
 
@@ -384,15 +513,26 @@ export const useAppStore = create<AppState>((set, get) => {
         fatigue: input.fatigue,
         note: input.note,
       };
-      // Newest-first, mirroring measurements.
-      set({ moodEntries: [entry, ...moodEntries] });
-      // A distressed check-in can raise an early-warning signal (rule 9).
+      commitActive({ moodEntries: [entry, ...moodEntries] });
       refreshAlerts();
+    },
+
+    addSymptom(input) {
+      const { profile, symptoms } = get();
+      const entry: SymptomEntry = {
+        id: nextId('sym'),
+        userId: profile.id,
+        date: new Date().toISOString(),
+        type: input.type,
+        severity: input.severity,
+        note: input.note,
+      };
+      commitActive({ symptoms: [entry, ...symptoms] });
     },
 
     setLogStatus(logId, status) {
       const { medicationLogs } = get();
-      set({
+      commitActive({
         medicationLogs: medicationLogs.map((log) =>
           log.id === logId
             ? { ...log, status, actualTime: status === 'taken' ? new Date().toISOString() : null }
@@ -403,13 +543,11 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     markAlertRead(id) {
-      set({ alerts: get().alerts.map((a) => (a.id === id ? { ...a, isRead: true } : a)) });
-      persist();
+      commitActive({ alerts: get().alerts.map((a) => (a.id === id ? { ...a, isRead: true } : a)) });
     },
 
     clearReadAlerts() {
-      set({ alerts: get().alerts.filter((a) => !a.isRead) });
-      persist();
+      commitActive({ alerts: get().alerts.filter((a) => !a.isRead) });
     },
 
     setRiskModel(model) {
@@ -418,28 +556,68 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     setRiskInputs(input) {
-      set({ profile: { ...get().profile, ...input, updatedAt: new Date().toISOString() } });
+      commitActive({ profile: { ...get().profile, ...input, updatedAt: new Date().toISOString() } });
       refreshAlerts();
     },
 
     setGoals(goals) {
-      set({ profile: { ...get().profile, ...goals, updatedAt: new Date().toISOString() } });
-      persist();
+      commitActive({ profile: { ...get().profile, ...goals, updatedAt: new Date().toISOString() } });
+    },
+
+    setCarePlan(input) {
+      const { carePlan, profile, currentDoctorId } = get();
+      const next: Record<string, unknown> = { ...carePlan };
+      for (const key of Object.keys(input) as (keyof CarePlanInput)[]) {
+        if (input[key] !== undefined) next[key] = input[key];
+      }
+      next.updatedByDoctorId = currentDoctorId;
+      next.updatedAt = new Date().toISOString();
+      // Reflect doctor's targets into the patient's goal fields so both sides agree.
+      const profilePatch: Partial<UserProfile> = {
+        ...(input.targetSystolicBp !== undefined ? { targetSystolicBp: input.targetSystolicBp } : {}),
+        ...(input.targetWeightKg !== undefined ? { targetWeightKg: input.targetWeightKg } : {}),
+      };
+      commitActive({ carePlan: next as CarePlan, profile: { ...profile, ...profilePatch } });
+    },
+
+    addNote(text) {
+      const { notes, currentDoctorId } = get();
+      const note: ClinicalNote = { id: nextId('note'), doctorId: currentDoctorId, date: new Date().toISOString(), text };
+      commitActive({ notes: [note, ...notes] });
+    },
+
+    sendMessage(text) {
+      const { messages, role } = get();
+      const message: Message = { id: nextId('msg'), fromRole: role, date: new Date().toISOString(), text, isRead: false };
+      commitActive({ messages: [...messages, message] });
+    },
+
+    markMessagesRead() {
+      const { messages, role } = get();
+      // Mark messages from the *other* party as read.
+      commitActive({ messages: messages.map((m) => (m.fromRole !== role ? { ...m, isRead: true } : m)) });
+    },
+
+    linkToDoctor(inviteCode) {
+      const { doctors, profile } = get();
+      const doctor = doctors.find((d) => d.inviteCode.toUpperCase() === inviteCode.trim().toUpperCase());
+      if (!doctor) return false;
+      commitActive({ profile: { ...profile, doctorId: doctor.id, updatedAt: new Date().toISOString() } });
+      return true;
+    },
+
+    unlinkDoctor() {
+      commitActive({ profile: { ...get().profile, doctorId: null, updatedAt: new Date().toISOString() } });
     },
 
     updateMedicalProfile(input) {
       const merged: UserProfile = { ...get().profile };
-      // Merge only keys actually provided — never clobber a required field with
-      // `undefined`. Keys are a known subset of UserProfile, so the single cast
-      // is sound (T-02: subset is checked at the type level by MedicalProfileInput).
       const writable = merged as unknown as Record<string, unknown>;
       for (const key of Object.keys(input) as (keyof MedicalProfileInput)[]) {
         const value = input[key];
         if (value !== undefined) writable[key] = value;
       }
-      set({ profile: { ...merged, updatedAt: new Date().toISOString() } });
-      // Clinical flags (diabetes/smoking/hypertension) feed the risk model →
-      // recompute alerts so the early-warning state stays consistent.
+      commitActive({ profile: { ...merged, updatedAt: new Date().toISOString() } });
       refreshAlerts();
     },
 
@@ -459,22 +637,43 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     applyOnboarding(profile, baseline) {
-      set({ role: 'patient', profile, measurements: [baseline], moodEntries: [], alerts: [] });
+      const id = profile.id && profile.id.length > 0 ? profile.id : nextId('user');
+      const finalProfile: UserProfile = { ...profile, id };
+      const record: PatientRecord = {
+        profile: finalProfile,
+        measurements: [baseline],
+        medications: [],
+        medicationLogs: [],
+        moodEntries: [],
+        alerts: [],
+        symptoms: [],
+        carePlan: {},
+        notes: [],
+        messages: [],
+      };
+      set({
+        role: 'patient',
+        records: { ...get().records, [id]: record },
+        activePatientId: id,
+        demoPatientId: id,
+        ...mirror(record),
+      });
       refreshAlerts();
     },
 
     resetDemo() {
-      const now = new Date();
-      const seed = createPatientSeed(now);
+      const seed = createMultiUserSeed(new Date());
+      const active = seed.records[seed.demoPatientId];
       set({
         role: 'patient',
-        profile: seed.profile,
-        measurements: seed.measurements,
-        medications: seed.medications,
-        medicationLogs: seed.medicationLogs,
-        moodEntries: seed.moodEntries,
-        alerts: [],
+        doctors: seed.doctors,
+        records: seed.records,
+        activePatientId: seed.demoPatientId,
+        currentDoctorId: seed.demoDoctorId,
+        demoPatientId: seed.demoPatientId,
+        demoDoctorId: seed.demoDoctorId,
         riskModel: 'score2',
+        ...mirror(active),
       });
       refreshAlerts();
     },
@@ -499,3 +698,23 @@ export const selectRecommendations = (s: AppState): Recommendation[] => {
 };
 export const selectUnreadAlertCount = (s: AppState): number => s.alerts.filter((a) => !a.isRead).length;
 export const selectMoodEntries = (s: AppState): MoodEntry[] => s.moodEntries;
+export const selectSymptoms = (s: AppState): SymptomEntry[] => s.symptoms;
+export const selectCarePlan = (s: AppState): CarePlan => s.carePlan;
+export const selectMessages = (s: AppState): Message[] => s.messages;
+export const selectUnreadMessageCount = (s: AppState): number =>
+  s.messages.filter((m) => !m.isRead && m.fromRole !== s.role).length;
+
+/** Records of patients enrolled under the currently logged-in doctor. */
+export const selectMyPatients = (s: AppState): PatientRecord[] =>
+  Object.values(s.records).filter((r) => r.profile.doctorId === s.currentDoctorId);
+
+/** The patient currently in view (active record). */
+export const selectActiveRecord = (s: AppState): PatientRecord | undefined => s.records[s.activePatientId];
+
+/** The clinician the active patient is enrolled under (if any). */
+export const selectLinkedDoctor = (s: AppState): Doctor | undefined =>
+  s.doctors.find((d) => d.id === s.profile.doctorId);
+
+/** The currently logged-in clinician. */
+export const selectCurrentDoctor = (s: AppState): Doctor | undefined =>
+  s.doctors.find((d) => d.id === s.currentDoctorId);
