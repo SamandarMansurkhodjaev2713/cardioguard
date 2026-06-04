@@ -9,7 +9,7 @@
 import { useRouter } from 'expo-router';
 import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { calculateAdherencePercent } from '../src/domain/calculators';
@@ -18,6 +18,7 @@ import { deriveRisk, useAppStore } from '../src/store/useAppStore';
 import { useTheme } from '../src/theme/ThemeProvider';
 import { AppText } from '../src/ui/AppText';
 import { Badge } from '../src/ui/Badge';
+import { Button } from '../src/ui/Button';
 import { Card } from '../src/ui/Card';
 import { Icon } from '../src/ui/Icon';
 import { PageHeader } from '../src/ui/PageHeader';
@@ -56,6 +57,18 @@ export default function PatientDetailScreen() {
       />
 
       <View style={{ paddingHorizontal: theme.space.screenPad, rowGap: theme.space.gap }}>
+        {/* Doctor actions */}
+        <View style={{ rowGap: theme.space.gapSm }}>
+          <View style={{ flexDirection: 'row', columnGap: theme.space.gapSm }}>
+            <View style={{ flex: 1 }}><Button label={t('doctor.detail.editCarePlan')} variant="secondary" leftIcon="shield" block onPress={() => router.push('/care-plan')} /></View>
+            <View style={{ flex: 1 }}><Button label={t('doctor.detail.prescribe')} variant="secondary" leftIcon="medication" block onPress={() => router.push('/prescribe')} /></View>
+          </View>
+          <View style={{ flexDirection: 'row', columnGap: theme.space.gapSm }}>
+            <View style={{ flex: 1 }}><Button label={t('notes.title')} variant="secondary" leftIcon="info" block onPress={() => router.push('/patient-notes')} /></View>
+            <View style={{ flex: 1 }}><Button label={t('messages.title')} variant="secondary" leftIcon="send" block onPress={() => router.push('/messages')} /></View>
+          </View>
+        </View>
+
         {/* Risk + adherence summary */}
         <Card style={{ rowGap: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -106,7 +119,9 @@ export default function PatientDetailScreen() {
             <AppText variant="help" style={{ paddingVertical: 8 }}>{t('medication.empty')}</AppText>
           ) : (
             medications.map((m, i) => (
-              <Stat key={m.id} label={`${m.name} · ${m.dosage}`} value={m.intakeTimes.join(', ')} first={i === 0} />
+              <Pressable key={m.id} onPress={() => router.push(`/prescribe?medId=${m.id}`)} accessibilityRole="button">
+                <Stat label={`${m.name} · ${m.dosage}`} value={m.intakeTimes.join(', ')} first={i === 0} chevron />
+              </Pressable>
             ))
           )}
         </Card>
@@ -132,17 +147,18 @@ export default function PatientDetailScreen() {
   );
 }
 
-function Stat({ label, value, first }: { readonly label: string; readonly value: string; readonly first?: boolean }) {
+function Stat({ label, value, first, chevron }: { readonly label: string; readonly value: string; readonly first?: boolean; readonly chevron?: boolean }) {
   const theme = useTheme();
   return (
     <View
       style={{
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', columnGap: 12,
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', columnGap: 10,
         paddingVertical: theme.space.rowPad, borderTopWidth: first ? 0 : 1, borderTopColor: theme.colors.hairline,
       }}
     >
       <AppText variant="help" color={theme.colors.text2} style={{ flex: 1 }}>{label}</AppText>
       <AppText variant="help" tabular style={{ fontFamily: theme.font.semibold, textAlign: 'right', flexShrink: 1 }}>{value as ReactNode}</AppText>
+      {chevron ? <Icon name="chevronRight" size={16} color={theme.colors.text3} /> : null}
     </View>
   );
 }

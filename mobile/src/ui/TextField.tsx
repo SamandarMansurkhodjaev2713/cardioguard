@@ -27,6 +27,7 @@ export interface TextFieldProps {
   readonly suffix?: string;
   readonly autoCapitalize?: TextInputProps['autoCapitalize'];
   readonly maxLength?: number;
+  readonly multiline?: boolean;
   readonly showPasswordLabel?: string;
   readonly hidePasswordLabel?: string;
   readonly onBlur?: () => void;
@@ -44,6 +45,7 @@ export function TextField({
   suffix,
   autoCapitalize = 'sentences',
   maxLength,
+  multiline = false,
   showPasswordLabel = 'Показать пароль',
   hidePasswordLabel = 'Скрыть пароль',
   onBlur,
@@ -62,9 +64,11 @@ export function TextField({
       <View
         style={{
           flexDirection: 'row',
-          alignItems: 'center',
-          height: 46,
+          alignItems: multiline ? 'flex-start' : 'center',
+          minHeight: multiline ? 92 : 46,
+          height: multiline ? undefined : 46,
           paddingHorizontal: 13,
+          paddingVertical: multiline ? 10 : 0,
           borderRadius: radius.field,
           backgroundColor: colors.surface,
           borderWidth: 1,
@@ -80,6 +84,8 @@ export function TextField({
           secureTextEntry={secure && !revealed}
           autoCapitalize={autoCapitalize}
           maxLength={maxLength}
+          multiline={multiline}
+          textAlignVertical={multiline ? 'top' : 'center'}
           onFocus={() => setFocused(true)}
           onBlur={() => {
             setFocused(false);
@@ -91,6 +97,7 @@ export function TextField({
             fontSize: fontSize.body,
             color: colors.text,
             paddingVertical: 0,
+            minHeight: multiline ? 72 : undefined,
             // Remove the browser focus ring on web (we render our own border).
             outlineWidth: 0,
           }}
