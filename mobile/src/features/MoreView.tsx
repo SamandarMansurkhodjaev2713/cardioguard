@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 
 import type { AppLanguage } from '../i18n';
-import { useAppStore } from '../store/useAppStore';
+import { selectUnreadMessageCount, useAppStore } from '../store/useAppStore';
 import { ReportButton } from './ReportButton';
 import { useTheme, useThemeControls, type AppearancePreference } from '../theme/ThemeProvider';
 import type { DensityPreset, RadiusPreset } from '../theme/tokens';
@@ -32,6 +32,7 @@ export function MoreView() {
   const language = useAppStore((s) => s.language);
   const setLanguage = useAppStore((s) => s.setLanguage);
   const resetDemo = useAppStore((s) => s.resetDemo);
+  const unreadMessages = useAppStore(selectUnreadMessageCount);
   const { preferences, setDensity, setRadius, setAppearance } = useThemeControls();
 
   const [resetDone, setResetDone] = useState(false);
@@ -40,11 +41,11 @@ export function MoreView() {
     setResetDone(true);
   };
 
-  const menu: Array<{ key: IconName; label: string; href: string }> = [
+  const menu: Array<{ key: IconName; label: string; href: string; badge?: number }> = [
     ...(role === 'patient'
       ? [
           { key: 'heart' as IconName, label: t('profile.title'), href: '/profile' },
-          { key: 'users' as IconName, label: t('myDoctor.title'), href: '/my-doctor' },
+          { key: 'users' as IconName, label: t('myDoctor.title'), href: '/my-doctor', badge: unreadMessages },
           { key: 'sparkles' as IconName, label: t('insights.title'), href: '/insights' },
           { key: 'moon' as IconName, label: t('wellbeing.title'), href: '/wellbeing' },
           { key: 'alert' as IconName, label: t('symptoms.title'), href: '/symptoms' },
@@ -102,6 +103,7 @@ export function MoreView() {
             >
               <Icon name={item.key} size={19} color={theme.colors.primary} />
               <AppText variant="body" style={{ flex: 1, fontFamily: theme.font.medium }}>{item.label}</AppText>
+              {item.badge ? <Badge label={String(item.badge)} tone="high" dot={false} /> : null}
               <Icon name="chevronRight" size={18} color={theme.colors.text3} />
             </Pressable>
           ))}

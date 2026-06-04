@@ -266,10 +266,10 @@ export function createMultiUserSeed(now: Date): MultiUserSeed {
 
   // Five more real patients from the deterministic cohort, all under the doctor.
   const members = generateCohortMembers(mulberry32(0x5eed_face), { groups: ['roster'], perGroup: 5 });
-  for (const member of members) {
-    const record = buildPatientRecord(member, now, doctor.id);
+  members.forEach((member, i) => {
+    const record = buildPatientRecord(member, i, now, doctor.id);
     records[record.profile.id] = record;
-  }
+  });
 
   return { doctors: [doctor], records, demoDoctorId: doctor.id, demoPatientId: alisher.profile.id };
 }

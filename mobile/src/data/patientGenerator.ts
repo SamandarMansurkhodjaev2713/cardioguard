@@ -23,9 +23,11 @@ import type {
 } from '../domain/types';
 import { chance, mulberry32, pick, randFloat, randInt, type Rng } from '../utils/prng';
 
+// Demo patient "Алишер Рахимов" is seeded separately — keep these distinct so the
+// roster never shows two patients with the same name.
 const NAMES_MALE = [
-  'Алишер Рахимов', 'Бахтиёр Каримов', 'Шавкат Юсупов', 'Тимур Назаров',
-  'Рустам Холматов', 'Дилшод Эргашев', 'Фаррух Тошматов', 'Улугбек Содиков',
+  'Бахтиёр Каримов', 'Шавкат Юсупов', 'Тимур Назаров', 'Рустам Холматов',
+  'Дилшод Эргашев', 'Фаррух Тошматов', 'Улугбек Содиков', 'Жасур Юнусов',
 ];
 const NAMES_FEMALE = [
   'Нигора Саидова', 'Дилноза Абдуллаева', 'Малика Юлдашева', 'Зухра Камилова',
@@ -41,16 +43,15 @@ function isoDaysAgo(now: Date, days: number, hour = 8, minute = 10): string {
   return d.toISOString();
 }
 
-function buildProfile(member: CohortMember, rng: Rng, doctorId: string, now: Date): UserProfile {
+function buildProfile(member: CohortMember, index: number, rng: Rng, doctorId: string, now: Date): UserProfile {
   const names = member.sex === 'male' ? NAMES_MALE : NAMES_FEMALE;
-  const idx = parseInt(member.id.replace(/\D/g, ''), 10) || 0;
   const conditions: string[] = [];
   if (member.hasHypertension) conditions.push('Артериальная гипертензия');
   if (member.hasDiabetes) conditions.push('Сахарный диабет 2 типа');
   return {
     id: `user_${member.id}`,
     anonymizedId: member.id,
-    fullName: names[idx % names.length],
+    fullName: names[index % names.length],
     age: member.age,
     sex: member.sex,
     heightCm: member.heightCm,
@@ -160,10 +161,10 @@ function buildMood(member: CohortMember, rng: Rng, now: Date): MoodEntry[] {
 }
 
 /** Build a complete, deterministic patient record from a cohort member. */
-export function buildPatientRecord(member: CohortMember, now: Date, doctorId: string): PatientRecord {
+export function buildPatientRecord(member: CohortMember, index: number, now: Date, doctorId: string): PatientRecord {
   const seed = 0x9e37 ^ (parseInt(member.id.replace(/\D/g, ''), 10) || 1);
   const rng = mulberry32(seed);
-  const profile = buildProfile(member, rng, doctorId, now);
+  const profile = buildProfile(member, index, rng, doctorId, now);
   const measurements = buildMeasurements(member, rng, now);
   const medications = buildMedications(member, now);
   const medicationLogs = buildLogs(member, medications, rng, now);

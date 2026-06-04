@@ -565,19 +565,17 @@ export const useAppStore = create<AppState>((set, get) => {
     },
 
     setCarePlan(input) {
-      const { carePlan, profile, currentDoctorId } = get();
+      const { carePlan, currentDoctorId } = get();
+      // The doctor's plan is kept separate from the patient's personal goals
+      // (profile.target*) — the patient sees the plan as authoritative guidance,
+      // but their own goal is theirs. So we write only carePlan here.
       const next: Record<string, unknown> = { ...carePlan };
       for (const key of Object.keys(input) as (keyof CarePlanInput)[]) {
         if (input[key] !== undefined) next[key] = input[key];
       }
       next.updatedByDoctorId = currentDoctorId;
       next.updatedAt = new Date().toISOString();
-      // Reflect doctor's targets into the patient's goal fields so both sides agree.
-      const profilePatch: Partial<UserProfile> = {
-        ...(input.targetSystolicBp !== undefined ? { targetSystolicBp: input.targetSystolicBp } : {}),
-        ...(input.targetWeightKg !== undefined ? { targetWeightKg: input.targetWeightKg } : {}),
-      };
-      commitActive({ carePlan: next as CarePlan, profile: { ...profile, ...profilePatch } });
+      commitActive({ carePlan: next as CarePlan });
     },
 
     addNote(text) {

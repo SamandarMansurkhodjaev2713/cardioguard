@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { calculateAdherencePercent } from '../src/domain/calculators';
 import { HealthIndexCard } from '../src/features/HealthIndexCard';
-import { deriveRisk, useAppStore } from '../src/store/useAppStore';
+import { deriveRisk, selectUnreadMessageCount, useAppStore } from '../src/store/useAppStore';
 import { useTheme } from '../src/theme/ThemeProvider';
 import { AppText } from '../src/ui/AppText';
 import { Badge } from '../src/ui/Badge';
@@ -38,6 +38,7 @@ export default function PatientDetailScreen() {
   const carePlan = useAppStore((s) => s.carePlan);
   const riskModel = useAppStore((s) => s.riskModel);
   const language = useAppStore((s) => s.language);
+  const unreadMessages = useAppStore(selectUnreadMessageCount);
 
   const risk = useMemo(() => deriveRisk({ profile, measurements, riskModel }), [profile, measurements, riskModel]);
   const adherence = calculateAdherencePercent(medicationLogs);
@@ -65,7 +66,7 @@ export default function PatientDetailScreen() {
           </View>
           <View style={{ flexDirection: 'row', columnGap: theme.space.gapSm }}>
             <View style={{ flex: 1 }}><Button label={t('notes.title')} variant="secondary" leftIcon="info" block onPress={() => router.push('/patient-notes')} /></View>
-            <View style={{ flex: 1 }}><Button label={t('messages.title')} variant="secondary" leftIcon="send" block onPress={() => router.push('/messages')} /></View>
+            <View style={{ flex: 1 }}><Button label={unreadMessages > 0 ? `${t('messages.title')} (${unreadMessages})` : t('messages.title')} variant="secondary" leftIcon="send" block onPress={() => router.push('/messages')} /></View>
           </View>
         </View>
 

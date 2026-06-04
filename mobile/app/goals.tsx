@@ -10,6 +10,7 @@ import { AppText } from '../src/ui/AppText';
 import { Badge } from '../src/ui/Badge';
 import { Button } from '../src/ui/Button';
 import { Card } from '../src/ui/Card';
+import { Icon } from '../src/ui/Icon';
 import { PageHeader } from '../src/ui/PageHeader';
 import { Progress } from '../src/ui/Progress';
 import { TextField } from '../src/ui/TextField';
@@ -31,7 +32,10 @@ export default function GoalsScreen() {
   const { t } = useTranslation();
   const profile = useAppStore((s) => s.profile);
   const latest = useAppStore(selectLatestMeasurement);
+  const carePlan = useAppStore((s) => s.carePlan);
   const setGoals = useAppStore((s) => s.setGoals);
+
+  const hasPlan = carePlan.targetSystolicBp != null || carePlan.targetWeightKg != null || !!carePlan.note;
 
   const [bp, setBp] = useState(String(profile.targetSystolicBp ?? 130));
   const [weight, setWeight] = useState(String(profile.targetWeightKg ?? defaultWeight(profile.heightCm)));
@@ -56,6 +60,29 @@ export default function GoalsScreen() {
       <PageHeader title={t('goals.title')} subtitle={t('goals.subtitle')} onBack={() => router.back()} />
 
       <View style={{ paddingHorizontal: theme.space.screenPad, rowGap: theme.space.gap }}>
+        {hasPlan ? (
+          <Card style={{ rowGap: 8, borderLeftWidth: 3, borderLeftColor: theme.colors.teal }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', columnGap: 8 }}>
+              <Icon name="shieldPlus" size={16} color={theme.colors.teal} />
+              <AppText variant="title">{t('goals.doctorPlanTitle')}</AppText>
+            </View>
+            <AppText variant="help" color={theme.colors.text3}>{t('goals.doctorPlanHint')}</AppText>
+            {carePlan.targetSystolicBp != null ? (
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <AppText variant="help" color={theme.colors.text2}>{t('carePlan.targetSystolic')}</AppText>
+                <AppText variant="help" tabular style={{ fontFamily: theme.font.semibold }}>{carePlan.targetSystolicBp} {t('units.mmHg')}</AppText>
+              </View>
+            ) : null}
+            {carePlan.targetWeightKg != null ? (
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <AppText variant="help" color={theme.colors.text2}>{t('carePlan.targetWeight')}</AppText>
+                <AppText variant="help" tabular style={{ fontFamily: theme.font.semibold }}>{carePlan.targetWeightKg} {t('units.kg')}</AppText>
+              </View>
+            ) : null}
+            {carePlan.note ? <AppText variant="help" color={theme.colors.text2} style={{ lineHeight: 19 }}>{carePlan.note}</AppText> : null}
+          </Card>
+        ) : null}
+
         <Card style={{ rowGap: theme.space.gap }}>
           <AppText variant="title">{t('goals.cardTitle')}</AppText>
           <GoalRow

@@ -84,14 +84,15 @@ describe('multi-user store', () => {
     expect(after.records[b].medications.length).toBe(bMedsBefore);
   });
 
-  it('setCarePlan stores the plan and reflects targets into the patient profile', () => {
+  it('setCarePlan stores the plan separately from the patient\'s own goals', () => {
+    const ownGoalBefore = get().profile.targetSystolicBp;
     get().setCarePlan({ targetSystolicBp: 125, targetWeightKg: 84, note: 'План лечения' });
     const after = get();
     expect(after.carePlan.targetSystolicBp).toBe(125);
     expect(after.carePlan.note).toBe('План лечения');
-    expect(after.profile.targetSystolicBp).toBe(125);
-    expect(after.profile.targetWeightKg).toBe(84);
     expect(after.records[after.demoPatientId].carePlan.targetSystolicBp).toBe(125);
+    // The doctor's plan does NOT overwrite the patient's personal goal field.
+    expect(after.profile.targetSystolicBp).toBe(ownGoalBefore);
   });
 
   it('linkToDoctor accepts the invite code (case-insensitive) and rejects an unknown one', () => {

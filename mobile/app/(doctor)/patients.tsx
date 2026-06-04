@@ -110,6 +110,7 @@ function PatientCard({
   const adherence = calculateAdherencePercent(medicationLogs);
   const band = adherenceBand(adherence);
   const unread = alerts.filter((a) => !a.isRead).length;
+  const unreadMsg = record.messages.filter((m) => m.fromRole === 'patient' && !m.isRead).length;
   const daysAgo = latest ? Math.round((Date.now() - new Date(latest.date).getTime()) / MS_PER_DAY) : null;
   const lastSeen =
     daysAgo === null ? t('doctor.patient.noData') : daysAgo <= 0 ? t('doctor.patient.today') : t('doctor.patient.daysAgo', { count: daysAgo });
@@ -139,7 +140,10 @@ function PatientCard({
         </View>
 
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          {unread > 0 ? <Badge label={t('doctor.patient.alerts', { count: unread })} tone="high" /> : <View />}
+          <View style={{ flexDirection: 'row', alignItems: 'center', columnGap: 6 }}>
+            {unread > 0 ? <Badge label={t('doctor.patient.alerts', { count: unread })} tone="high" /> : null}
+            {unreadMsg > 0 ? <Badge label={t('doctor.patient.newMessages', { count: unreadMsg })} tone="info" dot={false} /> : null}
+          </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', columnGap: 5 }}>
             <Icon name="clock" size={13} color={theme.colors.text3} />
             <AppText variant="help" color={theme.colors.text3}>{lastSeen}</AppText>
