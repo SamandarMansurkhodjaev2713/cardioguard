@@ -84,9 +84,10 @@ describe('Doctor screens (cohort analytics)', () => {
     expect(screen.getByText('Аналитика по группам')).toBeTruthy();
   });
 
-  it('patients lists the synthetic cohort', () => {
+  it('lists the doctor\'s real enrolled patients', () => {
     renderWithProviders(<DoctorPatientsScreen />);
-    expect(screen.getByText('Когорта пациентов')).toBeTruthy();
+    expect(screen.getByText('Мои пациенты')).toBeTruthy();
+    // Real records: anonymized ids shown for more than one enrolled patient.
     expect(screen.getAllByText(/^P-0\d+$/).length).toBeGreaterThan(1);
   });
 });
