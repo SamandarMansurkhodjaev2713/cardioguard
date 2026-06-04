@@ -12,7 +12,7 @@
 
 ## Стек
 
-- **Expo SDK 56** · React Native 0.85 · React 19.2
+- **Expo SDK 55** · React Native 0.83 · React 19
 - **TypeScript** (strict)
 - **Expo Router** (file-based навигация, группы вкладок patient/doctor)
 - **Zustand** — состояние; **AsyncStorage** — локальное хранение через слой-репозиторий
