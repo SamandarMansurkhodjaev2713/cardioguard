@@ -44,8 +44,10 @@ export function MoreView() {
     ...(role === 'patient'
       ? [
           { key: 'heart' as IconName, label: t('profile.title'), href: '/profile' },
+          { key: 'users' as IconName, label: t('myDoctor.title'), href: '/my-doctor' },
           { key: 'sparkles' as IconName, label: t('insights.title'), href: '/insights' },
           { key: 'moon' as IconName, label: t('wellbeing.title'), href: '/wellbeing' },
+          { key: 'alert' as IconName, label: t('symptoms.title'), href: '/symptoms' },
           { key: 'trendingUp' as IconName, label: t('goals.title'), href: '/goals' },
         ]
       : []),

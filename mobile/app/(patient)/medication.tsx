@@ -1,6 +1,7 @@
+import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, ScrollView, View } from 'react-native';
+import { Platform, Pressable, ScrollView, View } from 'react-native';
 
 import { adherenceBand } from '../../src/domain/calculators';
 import { buildReminderSlots } from '../../src/domain/reminders';
@@ -41,6 +42,7 @@ interface ScheduleSlot {
 
 export default function MedicationScreen() {
   const theme = useTheme();
+  const router = useRouter();
   const { t } = useTranslation();
   const role = useAppStore((s) => s.role);
   const medications = useAppStore((s) => s.medications);
@@ -223,33 +225,48 @@ export default function MedicationScreen() {
         </Card>
 
         {/* Active medications */}
-        <AppText variant="h2" style={{ marginTop: 4 }}>{t('medication.activeTitle')}</AppText>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+          <AppText variant="h2">{t('medication.activeTitle')}</AppText>
+          <Pressable
+            onPress={() => router.push('/prescribe')}
+            accessibilityRole="button"
+            accessibilityLabel={t('medication.add')}
+            hitSlop={8}
+            style={{ flexDirection: 'row', alignItems: 'center', columnGap: 4 }}
+          >
+            <Icon name="plus" size={16} color={theme.colors.primary} />
+            <AppText variant="label" color={theme.colors.primary}>{t('medication.add')}</AppText>
+          </Pressable>
+        </View>
         {medications.length === 0 ? (
           <Card><EmptyState compact icon="medication" title={t('medication.empty')} /></Card>
         ) : (
         <View style={{ rowGap: theme.space.gapSm }}>
           {medications.map((med) => (
-            <Card key={med.id} style={{ flexDirection: 'row', alignItems: 'flex-start', columnGap: 12 }}>
-              <View
-                style={{
-                  width: 38, height: 38, borderRadius: 10,
-                  backgroundColor: theme.colors.primarySoft,
-                  alignItems: 'center', justifyContent: 'center',
-                }}
-              >
-                <Icon name="medication" size={18} color={theme.colors.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', columnGap: 8 }}>
-                  <AppText variant="title">{med.name}</AppText>
-                  <Badge label={med.dosage} tone="neutral" dot={false} />
+            <Pressable key={med.id} onPress={() => router.push(`/prescribe?medId=${med.id}`)} accessibilityRole="button" style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}>
+              <Card style={{ flexDirection: 'row', alignItems: 'flex-start', columnGap: 12 }}>
+                <View
+                  style={{
+                    width: 38, height: 38, borderRadius: 10,
+                    backgroundColor: theme.colors.primarySoft,
+                    alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  <Icon name="medication" size={18} color={theme.colors.primary} />
                 </View>
-                <AppText variant="help" color={theme.colors.text3} style={{ marginTop: 2 }}>{med.instructions}</AppText>
-                <AppText variant="help" color={theme.colors.text2} style={{ marginTop: 4 }}>
-                  {t('medication.perDay', { count: med.frequencyPerDay })} · {t('medication.scheduleAt', { times: med.intakeTimes.join(', ') })}
-                </AppText>
-              </View>
-            </Card>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', columnGap: 8 }}>
+                    <AppText variant="title">{med.name}</AppText>
+                    <Badge label={med.dosage} tone="neutral" dot={false} />
+                  </View>
+                  <AppText variant="help" color={theme.colors.text3} style={{ marginTop: 2 }}>{med.instructions}</AppText>
+                  <AppText variant="help" color={theme.colors.text2} style={{ marginTop: 4 }}>
+                    {t('medication.perDay', { count: med.frequencyPerDay })} · {t('medication.scheduleAt', { times: med.intakeTimes.join(', ') })}
+                  </AppText>
+                </View>
+                <Icon name="chevronRight" size={16} color={theme.colors.text3} />
+              </Card>
+            </Pressable>
           ))}
         </View>
         )}
