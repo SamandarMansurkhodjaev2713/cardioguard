@@ -15,6 +15,7 @@ export default function ArticleScreen() {
   const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const articles = t('education.list', { returnObjects: true }) as Article[];
+  const categories = t('education.categories', { returnObjects: true }) as Record<string, string>;
   const article = articles.find((a) => a.id === id);
 
   if (!article) {
@@ -32,7 +33,7 @@ export default function ArticleScreen() {
       contentContainerStyle={{ paddingBottom: 32 }}
       showsVerticalScrollIndicator={false}
     >
-      <PageHeader title={article.category} onBack={() => router.back()} />
+      <PageHeader title={categories[article.category] ?? article.category} onBack={() => router.back()} />
 
       <View style={{ paddingHorizontal: theme.space.screenPad, rowGap: theme.space.gap }}>
         <View style={{ rowGap: 8 }}>
@@ -43,7 +44,11 @@ export default function ArticleScreen() {
           </View>
         </View>
 
-        <AppText variant="body" color={theme.colors.text} style={{ lineHeight: 23 }}>{article.body}</AppText>
+        <View style={{ rowGap: 12 }}>
+          {article.body.map((paragraph, i) => (
+            <AppText key={i} variant="body" color={theme.colors.text} style={{ lineHeight: 23 }}>{paragraph}</AppText>
+          ))}
+        </View>
 
         <AppText variant="h2" style={{ marginTop: 4 }}>{t('education.keyPoints')}</AppText>
         <Card style={{ rowGap: 11 }}>

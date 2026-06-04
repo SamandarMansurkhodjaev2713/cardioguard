@@ -4,6 +4,7 @@ import { ScrollView, View } from 'react-native';
 import type { RiskCategory } from '../../src/domain/types';
 import type { GroupStats } from '../../src/domain/cohort';
 import { DEMO_COHORT_SUMMARY } from '../../src/data/cohort';
+import { CohortExportButton } from '../../src/features/CohortExportButton';
 import { ReportButton } from '../../src/features/ReportButton';
 import { useAppStore } from '../../src/store/useAppStore';
 import { useTheme } from '../../src/theme/ThemeProvider';
@@ -107,6 +108,10 @@ export default function DoctorOverviewScreen() {
         <View style={{ rowGap: theme.space.gapSm }}>
           {COHORT.groups.map((group) => <GroupCard key={group.group} stats={group} />)}
         </View>
+
+        {/* Cohort data export (CSV) */}
+        <AppText variant="h2" style={{ marginTop: 6 }}>{t('doctor.export.title')}</AppText>
+        <CohortExportButton />
 
         {/* Patient report export */}
         <AppText variant="h2" style={{ marginTop: 6 }}>{t('report.button')}</AppText>
