@@ -43,15 +43,20 @@ const WEEKLY_MOOD: ReadonlyArray<{
   { lowMood: 2, anxiety: 2, stress: 2, emotionalInstability: 2, sleepProblems: 3, fatigue: 3 },
 ];
 
-/** Daily self-monitoring track (newest-first), aligned with the design's chart. */
-const DAILY: ReadonlyArray<{ sys: number; dia: number; hr: number; kg: number }> = [
-  { sys: 138, dia: 86, hr: 76, kg: 93.0 },
-  { sys: 141, dia: 88, hr: 75, kg: 92.8 },
-  { sys: 136, dia: 84, hr: 80, kg: 92.8 },
-  { sys: 131, dia: 83, hr: 72, kg: 92.6 },
-  { sys: 134, dia: 85, hr: 78, kg: 92.3 },
-  { sys: 133, dia: 83, hr: 74, kg: 92.0 },
-  { sys: 134, dia: 84, hr: 76, kg: 91.8 },
+/**
+ * Daily self-monitoring track (newest-first), aligned with the design's chart.
+ * Fasting glucose sits in the impaired/pre-diabetic band (5.9–6.3 mmol/L), which
+ * is what justifies the Metformin prescription for a patient whose diabetes is
+ * not yet diagnosed (pre-diabetes / insulin resistance).
+ */
+const DAILY: ReadonlyArray<{ sys: number; dia: number; hr: number; kg: number; glu: number }> = [
+  { sys: 138, dia: 86, hr: 76, kg: 93.0, glu: 6.1 },
+  { sys: 141, dia: 88, hr: 75, kg: 92.8, glu: 6.2 },
+  { sys: 136, dia: 84, hr: 80, kg: 92.8, glu: 6.0 },
+  { sys: 131, dia: 83, hr: 72, kg: 92.6, glu: 6.3 },
+  { sys: 134, dia: 85, hr: 78, kg: 92.3, glu: 6.1 },
+  { sys: 133, dia: 83, hr: 74, kg: 92.0, glu: 5.9 },
+  { sys: 134, dia: 84, hr: 76, kg: 91.8, glu: 6.0 },
 ];
 
 export function createPatientSeed(now: Date): PatientSeed {
@@ -75,7 +80,7 @@ export function createPatientSeed(now: Date): PatientSeed {
     sleepQuality: 'disturbed',
     stressLevel: 'high',
     dyslipidemiaStatus: 'yes',
-    chronicConditions: ['Артериальная гипертензия', 'Дислипидемия'],
+    chronicConditions: ['Артериальная гипертензия', 'Дислипидемия', 'Предиабет'],
     allergies: ['Пенициллин'],
     medicationNotes: 'Лизиноприл, Бисопролол, Аторвастатин, Метформин',
     unit: 'Подразделение №2',
@@ -93,6 +98,7 @@ export function createPatientSeed(now: Date): PatientSeed {
     heartRate: d.hr,
     weightKg: d.kg,
     bmi: calculateBmi(d.kg, HEIGHT_CM),
+    glucoseMmol: d.glu,
     waistCircumferenceCm: 104,
     sleepHours: i % 2 === 0 ? 6.2 : 5.6,
     stressLevel: i % 3 === 0 ? 'high' : 'medium',
@@ -119,7 +125,7 @@ export function createPatientSeed(now: Date): PatientSeed {
     {
       id: 'med_met', userId: profile.id, name: 'Метформин', dosage: '500 мг',
       frequencyPerDay: 2, intakeTimes: ['08:00', '14:00'], startDate: isoDaysAgo(now, 30),
-      endDate: null, instructions: 'Контроль гликемии', isActive: true,
+      endDate: null, instructions: 'Контроль гликемии · предиабет', isActive: true,
     },
   ];
 

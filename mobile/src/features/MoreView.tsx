@@ -11,6 +11,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 
 import type { AppLanguage } from '../i18n';
 import { useAppStore } from '../store/useAppStore';
+import { ReportButton } from './ReportButton';
 import { useTheme, useThemeControls, type AppearancePreference } from '../theme/ThemeProvider';
 import type { DensityPreset, RadiusPreset } from '../theme/tokens';
 import { AppText } from '../ui/AppText';
@@ -149,6 +150,14 @@ export function MoreView() {
             />
           </Setting>
         </Card>
+
+        {/* Doctor report (patient generates their own summary PDF) */}
+        {role === 'patient' ? (
+          <>
+            <AppText variant="h2" style={{ marginTop: 4 }}>{t('report.button')}</AppText>
+            <ReportButton />
+          </>
+        ) : null}
 
         {/* Data management */}
         <AppText variant="h2" style={{ marginTop: 4 }}>{t('more.dataTitle')}</AppText>

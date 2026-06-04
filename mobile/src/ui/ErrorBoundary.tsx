@@ -9,8 +9,23 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
+import { i18n } from '../i18n';
 import { palette } from '../theme/tokens';
 import { logger } from '../utils/logger';
+
+/**
+ * Translate with a hard-coded Russian fallback. The error screen must render even
+ * if i18n is uninitialized or itself the source of the failure, so this can never
+ * throw — on any problem it returns the fallback string.
+ */
+function tr(key: string, fallback: string): string {
+  try {
+    const value = i18n.t(key);
+    return typeof value === 'string' && value.length > 0 && value !== key ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 interface ErrorBoundaryProps {
   readonly children: ReactNode;
@@ -49,21 +64,21 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
           <Text style={{ fontSize: 28 }}>⚠️</Text>
         </View>
         <Text style={{ fontSize: 18, fontWeight: '700', color: palette.text, textAlign: 'center' }}>
-          Что-то пошло не так
+          {tr('errors.crashTitle', 'Что-то пошло не так')}
         </Text>
         <Text style={{ fontSize: 14, color: palette.text2, textAlign: 'center', lineHeight: 20, maxWidth: 320 }}>
-          Произошла непредвиденная ошибка. Данные сохранены локально — попробуйте продолжить.
+          {tr('errors.crashBody', 'Произошла непредвиденная ошибка. Данные сохранены локально — попробуйте продолжить.')}
         </Text>
         <Pressable
           onPress={this.reset}
           accessibilityRole="button"
-          accessibilityLabel="Попробовать снова"
+          accessibilityLabel={tr('errors.retry', 'Попробовать снова')}
           style={{
             marginTop: 6, height: 48, paddingHorizontal: 24, borderRadius: 14,
             backgroundColor: palette.primary, alignItems: 'center', justifyContent: 'center',
           }}
         >
-          <Text style={{ color: palette.onPrimary, fontSize: 15, fontWeight: '600' }}>Попробовать снова</Text>
+          <Text style={{ color: palette.onPrimary, fontSize: 15, fontWeight: '600' }}>{tr('errors.retry', 'Попробовать снова')}</Text>
         </Pressable>
       </View>
     );

@@ -43,7 +43,7 @@ export default function GoalsScreen() {
 
   const bpTarget = parseNum(bp) ?? 130;
   const weightTarget = parseNum(weight) ?? defaultWeight(profile.heightCm);
-  const bpNow = latest?.systolicBp ?? profile.weightKg;
+  const sysNow = latest?.systolicBp; // undefined until the first measurement exists
   const weightNow = latest?.weightKg ?? profile.weightKg;
 
   return (
@@ -60,11 +60,11 @@ export default function GoalsScreen() {
           <AppText variant="title">{t('goals.cardTitle')}</AppText>
           <GoalRow
             label={t('goals.bp')}
-            now={latest?.systolicBp ?? 0}
+            now={sysNow}
             target={bpTarget}
             unit={t('units.mmHg')}
-            fraction={clamp01(bpTarget / (latest?.systolicBp ?? bpTarget))}
-            reached={(latest?.systolicBp ?? 999) <= bpTarget}
+            fraction={sysNow ? clamp01(bpTarget / sysNow) : 0}
+            reached={sysNow != null && sysNow <= bpTarget}
           />
           <GoalRow
             label={t('goals.weight')}
@@ -96,7 +96,8 @@ function GoalRow({
   reached,
 }: {
   readonly label: string;
-  readonly now: number;
+  /** Current value; undefined when there is no measurement yet. */
+  readonly now: number | undefined;
   readonly target: number;
   readonly unit: string;
   readonly fraction: number;
@@ -104,17 +105,20 @@ function GoalRow({
 }) {
   const theme = useTheme();
   const { t } = useTranslation();
-  const delta = Math.round((now - target) * 10) / 10;
+  const hasData = now != null;
+  const delta = hasData ? Math.round((now - target) * 10) / 10 : 0;
   return (
     <View style={{ rowGap: 6 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <AppText variant="label">{label}</AppText>
         <AppText variant="help" tabular style={{ fontFamily: theme.font.semibold }}>
-          {now} → {t('goals.targetLabel', { value: `${target} ${unit}` })}
+          {hasData ? now : '—'} → {t('goals.targetLabel', { value: `${target} ${unit}` })}
         </AppText>
       </View>
-      <Progress value={fraction} tone={reached ? 'ok' : 'warn'} />
-      {reached ? (
+      <Progress value={fraction} tone={!hasData ? 'primary' : reached ? 'ok' : 'warn'} />
+      {!hasData ? (
+        <AppText variant="help">{t('goals.noData')}</AppText>
+      ) : reached ? (
         <Badge label={t('goals.reached')} tone="ok" />
       ) : (
         <AppText variant="help">{t('goals.toGo', { value: delta, unit })}</AppText>

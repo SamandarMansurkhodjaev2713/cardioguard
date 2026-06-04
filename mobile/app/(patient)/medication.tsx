@@ -17,6 +17,7 @@ import { AppText } from '../../src/ui/AppText';
 import { Badge } from '../../src/ui/Badge';
 import { Button } from '../../src/ui/Button';
 import { Card } from '../../src/ui/Card';
+import { EmptyState } from '../../src/ui/EmptyState';
 import { Icon } from '../../src/ui/Icon';
 import { PageHeader } from '../../src/ui/PageHeader';
 import { Progress } from '../../src/ui/Progress';
@@ -223,6 +224,9 @@ export default function MedicationScreen() {
 
         {/* Active medications */}
         <AppText variant="h2" style={{ marginTop: 4 }}>{t('medication.activeTitle')}</AppText>
+        {medications.length === 0 ? (
+          <Card><EmptyState compact icon="medication" title={t('medication.empty')} /></Card>
+        ) : (
         <View style={{ rowGap: theme.space.gapSm }}>
           {medications.map((med) => (
             <Card key={med.id} style={{ flexDirection: 'row', alignItems: 'flex-start', columnGap: 12 }}>
@@ -248,6 +252,7 @@ export default function MedicationScreen() {
             </Card>
           ))}
         </View>
+        )}
       </View>
     </ScrollView>
   );

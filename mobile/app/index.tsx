@@ -23,6 +23,7 @@ export default function AuthScreen() {
   const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
 
+  const canLogin = userId.trim().length > 0 && password.trim().length > 0;
   const enterPatient = () => {
     enterAs('patient');
     router.replace('/(patient)/dashboard');
@@ -75,7 +76,7 @@ export default function AuthScreen() {
           showPasswordLabel={t('auth.showPassword')}
           hidePasswordLabel={t('auth.hidePassword')}
         />
-        <Button label={t('auth.login')} block onPress={enterPatient} />
+        <Button label={t('auth.login')} block disabled={!canLogin} onPress={enterPatient} />
 
         <Divider label={t('auth.demoAccess')} />
 

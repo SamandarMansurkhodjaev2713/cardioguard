@@ -177,9 +177,13 @@ export default function MonitoringScreen() {
         </AppText>
 
         <Card bare style={{ paddingHorizontal: theme.space.padCard }}>
-          {measurements.map((m, i) => (
-            <MeasurementRow key={m.id} measurement={m} language={language} isFirst={i === 0} />
-          ))}
+          {measurements.length === 0 ? (
+            <EmptyState compact icon="monitoring" title={t('monitoring.empty')} />
+          ) : (
+            measurements.map((m, i) => (
+              <MeasurementRow key={m.id} measurement={m} language={language} isFirst={i === 0} />
+            ))
+          )}
         </Card>
       </View>
     </ScrollView>

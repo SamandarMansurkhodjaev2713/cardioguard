@@ -16,6 +16,7 @@ import { HealthIndexCard } from '../../src/features/HealthIndexCard';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { AppText } from '../../src/ui/AppText';
 import { Chip } from '../../src/ui/Chip';
+import { EmptyState } from '../../src/ui/EmptyState';
 import { Icon } from '../../src/ui/Icon';
 import { MetricCard } from '../../src/ui/MetricCard';
 import { RolePill } from '../../src/ui/RolePill';
@@ -54,7 +55,21 @@ export default function DashboardScreen() {
   const firstName = profile.fullName.split(' ')[0];
 
   if (!latest) {
-    return null;
+    return (
+      <ScrollView
+        style={{ flex: 1, backgroundColor: theme.colors.bg }}
+        contentContainerStyle={{ flexGrow: 1, paddingHorizontal: theme.space.screenPad, paddingTop: insets.top + 24 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <AppText variant="h1">{t('dashboard.greeting', { name: firstName })}</AppText>
+        <View style={{ flex: 1, justifyContent: 'center', rowGap: 16 }}>
+          <EmptyState icon="heart" title={t('dashboard.empty.title')} hint={t('dashboard.empty.hint')} />
+          <View style={{ alignItems: 'center' }}>
+            <Chip label={t('dashboard.addMeasurement')} icon="plus" onPress={() => router.push('/measurement')} />
+          </View>
+        </View>
+      </ScrollView>
+    );
   }
 
   const bpCategory = classifyBloodPressure(latest.systolicBp, latest.diastolicBp);

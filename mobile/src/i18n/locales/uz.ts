@@ -103,6 +103,10 @@ export const uz: Translations = {
     monitoringNote: 'Profilaktik monitoring. Shifokor maslahatini almashtirmaydi.',
     addMeasurement: 'Oʻlchov qoʻshish',
     markIntake: 'Qabulni belgilash',
+    empty: {
+      title: 'Hozircha oʻlchovlar yoʻq',
+      hint: 'Koʻrsatkichlar, xavf va tahlilni koʻrish uchun birinchi oʻlchovni qoʻshing.',
+    },
     bpDynamics: '7 kunlik AB dinamikasi',
     weeklyTrend: 'haftasiga {{sign}}{{value}}',
     warningsActive: '{{count}} ta faol',
@@ -501,6 +505,7 @@ export const uz: Translations = {
     reached: 'Maqsadga erishildi',
     toGo: 'maqsadgacha: {{value}} {{unit}}',
     targetLabel: 'maqsad {{value}}',
+    noData: 'Maʼlumot yoʻq — oʻlchov qoʻshing',
   },
   report: {
     button: 'Shifokor uchun hisobot',
@@ -715,5 +720,10 @@ export const uz: Translations = {
       sleep: 'Uyqu',
       wellbeing: 'Kayfiyat',
     },
+  },
+  errors: {
+    crashTitle: 'Nimadir notoʻgʻri ketdi',
+    crashBody: 'Kutilmagan xatolik yuz berdi. Maʼlumotlar qurilmada saqlangan — davom etishga harakat qiling.',
+    retry: 'Qayta urinish',
   },
 };
