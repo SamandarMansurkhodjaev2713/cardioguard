@@ -289,6 +289,7 @@ export const ru = {
     },
     kpi: {
       users: 'Пользователей',
+      patients: 'Пациентов',
       avgBp: 'Среднее АД',
       avgBmi: 'Средний ИМТ',
       avgAdherence: 'Средняя приверженность',

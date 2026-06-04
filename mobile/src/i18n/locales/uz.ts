@@ -289,6 +289,7 @@ export const uz: Translations = {
     },
     kpi: {
       users: 'Foydalanuvchilar',
+      patients: 'Bemorlar',
       avgBp: 'Oʻrtacha AB',
       avgBmi: 'Oʻrtacha TVI',
       avgAdherence: 'Oʻrtacha rioya',

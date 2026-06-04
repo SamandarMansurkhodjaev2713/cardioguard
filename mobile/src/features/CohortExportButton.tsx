@@ -1,14 +1,16 @@
 /**
- * "Export cohort (CSV)" action for the researcher panel. Serializes the de-identified
- * cohort to a readable, localized CSV and shares/downloads it — restoring the data
- * export the original Kotlin app had. Self-contained: drop in with `<CohortExportButton />`.
+ * "Export cohort (CSV)" for the researcher panel. Serializes the doctor's real,
+ * de-identified patient roster to a readable, Excel-ready CSV and shares /
+ * downloads it (restoring the data export the original Kotlin app had).
+ * Self-contained: drop in with `<CohortExportButton />`.
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
-import { DEMO_COHORT } from '../data/cohort';
+import { calculateAdherencePercent } from '../domain/calculators';
+import { deriveRisk, useAppStore } from '../store/useAppStore';
 import { exportCsv, type CsvExportResult } from '../services/cohortExport';
 import { useTheme } from '../theme/ThemeProvider';
 import { toCsv } from '../utils/csv';
@@ -18,43 +20,56 @@ import { Card } from '../ui/Card';
 import { Icon } from '../ui/Icon';
 
 const COLUMN_KEYS = [
-  'id', 'group', 'age', 'sex', 'systolic', 'diastolic', 'bmi', 'weight',
+  'id', 'age', 'sex', 'systolic', 'diastolic', 'bmi', 'weight',
   'adherence', 'risk', 'stress', 'hypertension', 'diabetes', 'alerts',
 ] as const;
 
 export function CohortExportButton() {
   const theme = useTheme();
   const { t } = useTranslation();
+  const records = useAppStore((s) => s.records);
+  const currentDoctorId = useAppStore((s) => s.currentDoctorId);
+  const riskModel = useAppStore((s) => s.riskModel);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<CsvExportResult | null>(null);
+
+  const roster = useMemo(
+    () => Object.values(records).filter((r) => r.profile.doctorId === currentDoctorId),
+    [records, currentDoctorId],
+  );
 
   const buildCsv = (): string => {
     const yn = (value: boolean) => t(`doctor.export.${value ? 'yes' : 'no'}`);
     const headers = COLUMN_KEYS.map((key) => t(`doctor.export.columns.${key}`));
-    const rows = DEMO_COHORT.map((m) => [
-      m.id,
-      t(`doctor.groupNames.${m.group}`),
-      String(m.age),
-      t(`enums.sex.${m.sex}`),
-      String(m.systolicBp),
-      String(m.diastolicBp),
-      String(m.bmi),
-      String(m.weightKg),
-      String(m.adherencePercent),
-      t(`enums.riskCategory.${m.riskCategory}`),
-      t(`enums.stress.${m.stressLevel}`),
-      yn(m.hasHypertension),
-      yn(m.hasDiabetes),
-      String(m.activeAlerts),
-    ]);
+    const rows = roster.map((r) => {
+      const latest = r.measurements[0];
+      const risk = deriveRisk({ profile: r.profile, measurements: r.measurements, riskModel });
+      const adherence = calculateAdherencePercent(r.medicationLogs);
+      const unread = r.alerts.filter((a) => !a.isRead).length;
+      return [
+        r.profile.anonymizedId,
+        String(r.profile.age),
+        t(`enums.sex.${r.profile.sex}`),
+        latest ? String(latest.systolicBp) : '',
+        latest ? String(latest.diastolicBp) : '',
+        latest ? String(latest.bmi) : '',
+        latest ? String(latest.weightKg) : '',
+        String(adherence),
+        t(`enums.riskCategory.${risk.category}`),
+        t(`enums.stress.${r.profile.stressLevel}`),
+        yn(r.profile.hypertensionStatus === 'yes'),
+        yn(r.profile.diabetesStatus === 'yes'),
+        String(unread),
+      ];
+    });
     return toCsv([headers, ...rows]);
   };
 
   const onExport = async () => {
-    if (busy) return;
+    if (busy || roster.length === 0) return;
     setBusy(true);
     setResult(null);
-    const outcome = await exportCsv(buildCsv(), 'cardioguard-cohort.csv', t('doctor.export.dialogTitle'));
+    const outcome = await exportCsv(buildCsv(), 'cardioguard-patients.csv', t('doctor.export.dialogTitle'));
     setResult(outcome);
     setBusy(false);
   };
@@ -73,7 +88,7 @@ export function CohortExportButton() {
         <View style={{ flex: 1 }}>
           <AppText variant="title">{t('doctor.export.title')}</AppText>
           <AppText variant="help" color={theme.colors.text3}>
-            {t('doctor.export.hint', { count: DEMO_COHORT.length })}
+            {t('doctor.export.hint', { count: roster.length })}
           </AppText>
         </View>
       </View>
@@ -84,6 +99,7 @@ export function CohortExportButton() {
         leftIcon="download"
         block
         loading={busy}
+        disabled={roster.length === 0}
         onPress={onExport}
       />
 

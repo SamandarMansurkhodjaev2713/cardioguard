@@ -78,10 +78,11 @@ describe('GoalsScreen', () => {
 describe('Doctor screens (cohort analytics)', () => {
   beforeEach(() => seedStore());
 
-  it('overview renders KPIs and the per-group breakdown', () => {
+  it('overview renders KPIs and risk distribution over the real roster', () => {
     renderWithProviders(<DoctorOverviewScreen />);
     expect(screen.getByText('Панель исследователя')).toBeTruthy();
-    expect(screen.getByText('Аналитика по группам')).toBeTruthy();
+    expect(screen.getByText('Распределение риска ССЗ')).toBeTruthy();
+    expect(screen.getByText('Пациентов')).toBeTruthy();
   });
 
   it('lists the doctor\'s real enrolled patients', () => {
