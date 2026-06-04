@@ -704,9 +704,10 @@ export const selectMessages = (s: AppState): Message[] => s.messages;
 export const selectUnreadMessageCount = (s: AppState): number =>
   s.messages.filter((m) => !m.isRead && m.fromRole !== s.role).length;
 
-/** Records of patients enrolled under the currently logged-in doctor. */
-export const selectMyPatients = (s: AppState): PatientRecord[] =>
-  Object.values(s.records).filter((r) => r.profile.doctorId === s.currentDoctorId);
+// NB: the doctor's roster (records filtered by currentDoctorId) is intentionally
+// NOT exposed as a selector — building a fresh array each call would loop when
+// used as a hook (unstable getSnapshot). Screens select `records` +
+// `currentDoctorId` and derive the roster via useMemo instead.
 
 /** The patient currently in view (active record). */
 export const selectActiveRecord = (s: AppState): PatientRecord | undefined => s.records[s.activePatientId];
