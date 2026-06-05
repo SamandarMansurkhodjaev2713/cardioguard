@@ -1,0 +1,66 @@
+name: Deploy web demo
+
+# Static web build of the Expo app, published to GitHub Pages.
+# - The Expo `experiments.baseUrl` is set to "/cardioguard" so assets resolve at
+#   the repo subpath GitHub Pages serves from.
+# - `dist/404.html` is a copy of `index.html` so Expo Router's client-side
+#   routes survive a hard refresh on GitHub Pages (which has no SPA rewrite).
+# - `.nojekyll` keeps Pages from stripping files starting with `_` (the
+#   `_expo/...` chunks Expo emits).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: mobile
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Export static web build
+        run: npx expo export --platform web
+
+      - name: SPA fallback + Jekyll opt-out
+        run: |
+          cp dist/index.html dist/404.html
+          touch dist/.nojekyll
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: mobile/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

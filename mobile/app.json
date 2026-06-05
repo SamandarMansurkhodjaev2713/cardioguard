@@ -10,6 +10,9 @@
     "runtimeVersion": {
       "policy": "appVersion"
     },
+    "experiments": {
+      "baseUrl": "/cardioguard"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cardioguard.app",
