@@ -17,6 +17,14 @@
 > клинической валидации. Приложение **не устанавливает диагноз** и не заменяет
 > консультацию врача. Демонстрационный вход без реальной аутентификации.
 
+## English Overview
+
+**CardioGuard** is a cross-platform cardiometabolic monitoring prototype for patients and doctors/researchers. It combines a React Native/Expo mobile application with a legacy Kotlin/Jetpack Compose prototype, domain-focused health calculations, adherence tracking, reports, local analytics and multilingual UX.
+
+The repository demonstrates product engineering in a sensitive health-tech domain: strict TypeScript, isolated domain logic, local-first state, Zod validation, i18n, PDF reports, accessibility work, CI and a substantial test suite around risk calculators, alerts, health index, data validation and UI primitives.
+
+**Live web preview:** https://samandarmansurkhodjaev2713.github.io/cardioguard/
+
 CardioGuard — дипломный клинико-технологический проект для непрерывного самоконтроля
 кардиометаболического здоровья, повышения приверженности лечению и превентивного снижения
 риска ССЗ. Репозиторий содержит **две реализации**:
